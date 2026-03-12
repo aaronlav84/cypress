@@ -1,6 +1,6 @@
 // @ts-check
 import "@cypress/code-coverage/support";
-import "@shelex/cypress-allure-plugin";
+// import "allure-cypress"; // re-enable after: yarn install allure-cypress
 import "./commands";
 import "./custom-commands";
 import { isMobile } from "./utils";

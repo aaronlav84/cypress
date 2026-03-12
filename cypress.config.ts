@@ -4,7 +4,6 @@ import axios from "axios";
 import dotenv from "dotenv";
 import Promise from "bluebird";
 import codeCoverageTask from "@cypress/code-coverage/task";
-import allureWriter from "@shelex/cypress-allure-plugin/writer";
 import { defineConfig } from "cypress";
 import viteConfig from "./vite.cypress.config.ts";
 
@@ -143,7 +142,7 @@ export default defineConfig({
       });
 
       codeCoverageTask(on, config);
-      allureWriter(on, config);
+      // allureCypress(on, config); // re-enable after: yarn install allure-cypress
       return config;
     },
   },
