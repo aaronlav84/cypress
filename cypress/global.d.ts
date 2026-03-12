@@ -154,5 +154,39 @@ declare namespace Cypress {
      * Logs in to AWS Cognito Federated via cy.origin()
      */
     loginByCognito(username: string, password: string): Chainable<any>;
+
+    /**
+     * Waits for skeleton loading indicators to disappear before continuing
+     */
+    waitForLoadingToFinish(): Chainable<void>;
+
+    /**
+     * Smart cy.intercept wrapper — auto-generates an alias from method + URL.
+     * Optionally stubs the response with a fixture file.
+     * Returns the alias string e.g. "@GET_transactions"
+     */
+    interceptApi(method: string, url: string, fixture?: string): Chainable<string>;
+
+    /**
+     * Creates a transaction directly via the REST API, bypassing the UI.
+     * Useful for test data setup.
+     */
+    createTransactionViaApi(payload: {
+      senderId: string;
+      receiverId: string;
+      amount: number;
+      description: string;
+      transactionType: "payment" | "request";
+    }): Chainable<Response>;
+
+    /**
+     * Asserts a visible success or error notification banner contains the expected message
+     */
+    assertNotification(type: "success" | "error", message: string): Chainable<void>;
+
+    /**
+     * Asserts the document <title> includes the expected string
+     */
+    assertPageTitle(expectedTitle: string): Chainable<void>;
   }
 }
