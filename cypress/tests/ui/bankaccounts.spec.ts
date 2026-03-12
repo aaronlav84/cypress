@@ -1,5 +1,6 @@
 import { User } from "../../../src/models";
 import { isMobile } from "../../support/utils";
+import { BankAccountPage } from "../../pages";
 
 const apiGraphQL = `${Cypress.env("apiUrl")}/graphql`;
 
@@ -9,6 +10,7 @@ type BankAccountsTestCtx = {
 
 describe("Bank Accounts", function () {
   const ctx: BankAccountsTestCtx = {};
+  const bankAccountPage = new BankAccountPage();
 
   beforeEach(function () {
     cy.task("db:seed");
@@ -44,112 +46,103 @@ describe("Bank Accounts", function () {
 
   it("creates a new bank account", function () {
     cy.wait("@getNotifications");
-    if (isMobile()) {
-      cy.getBySel("sidenav-toggle").click();
-    }
 
-    cy.getBySel("sidenav-bankaccounts").click();
+    bankAccountPage
+      .navigateViaSidenav(isMobile())
+      .clickNewAccount()
+      .assertOnNewAccountPage();
 
-    cy.getBySel("bankaccount-new").click();
-    cy.location("pathname").should("eq", "/bankaccounts/new");
     cy.visualSnapshot("Display New Bank Account Form");
 
-    cy.getBySelLike("bankName-input").type("The Best Bank");
-    cy.getBySelLike("routingNumber-input").type("987654321");
-    cy.getBySelLike("accountNumber-input").type("123456789");
+    bankAccountPage.fillForm({
+      bankName: "The Best Bank",
+      routingNumber: "987654321",
+      accountNumber: "123456789",
+    });
+
     cy.visualSnapshot("Fill out New Bank Account Form");
-    cy.getBySelLike("submit").click();
+    bankAccountPage.submit();
 
     cy.wait("@gqlCreateBankAccountMutation");
 
-    cy.getBySelLike("bankaccount-list-item")
-      .should("have.length", 2)
-      .eq(1)
-      .should("contain", "The Best Bank");
+    bankAccountPage
+      .assertAccountListLength(2)
+      .assertAccountListContains(1, "The Best Bank");
+
     cy.visualSnapshot("Bank Account Created");
   });
 
   it("should display bank account form errors", function () {
-    cy.visit("/bankaccounts");
-    cy.getBySel("bankaccount-new").click();
+    bankAccountPage.visit().clickNewAccount();
 
-    cy.getBySelLike("bankName-input").type("The");
-    cy.getBySelLike("bankName-input").find("input").clear();
-    cy.getBySelLike("bankName-input").find("input").blur();
-    cy.get("#bankaccount-bankName-input-helper-text")
-      .should("be.visible")
-      .and("contain", "Enter a bank name");
+    // Bank name — required
+    bankAccountPage.clearBankName().assertBankNameError("Enter a bank name");
 
-    cy.getBySelLike("bankName-input").type("The");
-    cy.getBySelLike("bankName-input").find("input").blur();
-    cy.get("#bankaccount-bankName-input-helper-text")
-      .should("be.visible")
-      .and("contain", "Must contain at least 5 characters");
+    // Bank name — too short
+    bankAccountPage
+      .enterBankName("The")
+      .clearBankName()
+      .enterBankName("The")
+      .assertBankNameError("Must contain at least 5 characters");
 
-    /** Routing number input validations **/
-    // Required field
+    // Routing number — required
     cy.getBySelLike("routingNumber-input").find("input").focus();
-    cy.getBySelLike("routingNumber-input").find("input").blur();
-    cy.get(`#bankaccount-routingNumber-input-helper-text`)
-      .should("be.visible")
-      .and("contain", "Enter a valid bank routing number");
+    bankAccountPage.blurRoutingNumber().assertRoutingNumberError("Enter a valid bank routing number");
 
-    // Min 9 digit
-    cy.getBySelLike("routingNumber-input").type("12345678");
-    cy.getBySelLike("routingNumber-input").find("input").blur();
+    // Routing number — too short
+    bankAccountPage
+      .enterRoutingNumber("12345678")
+      .blurRoutingNumber()
+      .assertRoutingNumberError("Must contain a valid routing number")
+      .clearRoutingNumber();
 
-    cy.get("#bankaccount-routingNumber-input-helper-text")
-      .should("be.visible")
-      .and("contain", "Must contain a valid routing number");
-    cy.getBySelLike("routingNumber-input").find("input").clear();
+    // Routing number — valid
+    bankAccountPage
+      .enterRoutingNumber("123456789")
+      .blurRoutingNumber()
+      .assertRoutingNumberErrorAbsent();
 
-    cy.getBySelLike("routingNumber-input").type("123456789");
-    cy.getBySelLike("routingNumber-input").find("input").blur();
-    cy.get("#bankaccount-routingNumber-input-helper-text").should("not.exist");
-
-    /** Account number input validations **/
-    // Required field
+    // Account number — required
     cy.getBySelLike("accountNumber-input").find("input").focus();
-    cy.getBySelLike("accountNumber-input").find("input").blur();
-    cy.get(`#bankaccount-accountNumber-input-helper-text`)
-      .should("be.visible")
-      .and("contain", "Enter a valid bank account number");
+    bankAccountPage.blurAccountNumber().assertAccountNumberError("Enter a valid bank account number");
 
-    // Min 9 digit
-    cy.getBySelLike("accountNumber-input").type("12345678");
-    cy.getBySelLike("accountNumber-input").find("input").blur();
-    cy.get("#bankaccount-accountNumber-input-helper-text")
-      .should("be.visible")
-      .and("contain", "Must contain at least 9 digits");
-    cy.getBySelLike("accountNumber-input").find("input").clear();
+    // Account number — too short
+    bankAccountPage
+      .enterAccountNumber("12345678")
+      .blurAccountNumber()
+      .assertAccountNumberError("Must contain at least 9 digits")
+      .clearAccountNumber();
 
-    cy.getBySelLike("accountNumber-input").type("123456789");
-    cy.getBySelLike("accountNumber-input").find("input").blur();
-    cy.get("#bankaccount-accountNumber-input-helper-text").should("not.exist");
-    cy.getBySelLike("accountNumber-input").find("input").clear();
+    // Account number — valid minimum
+    bankAccountPage
+      .enterAccountNumber("123456789")
+      .blurAccountNumber()
+      .assertAccountNumberErrorAbsent()
+      .clearAccountNumber();
 
-    // Max 12 gdigit
-    cy.getBySelLike("accountNumber-input").type("123456789111");
-    cy.getBySelLike("accountNumber-input").find("input").blur();
-    cy.get("#bankaccount-accountNumber-input-helper-text").should("not.exist");
-    cy.getBySelLike("accountNumber-input").find("input").clear();
+    // Account number — valid maximum
+    bankAccountPage
+      .enterAccountNumber("123456789111")
+      .blurAccountNumber()
+      .assertAccountNumberErrorAbsent()
+      .clearAccountNumber();
 
-    cy.getBySelLike("accountNumber-input").type("1234567891111");
-    cy.getBySelLike("accountNumber-input").find("input").blur();
-    cy.get("#bankaccount-accountNumber-input-helper-text")
-      .should("be.visible")
-      .and("contain", "Must contain no more than 12 digits");
+    // Account number — too long
+    bankAccountPage
+      .enterAccountNumber("1234567891111")
+      .blurAccountNumber()
+      .assertAccountNumberError("Must contain no more than 12 digits");
 
-    cy.getBySel("bankaccount-submit").should("be.disabled");
+    bankAccountPage.assertSubmitDisabled();
     cy.visualSnapshot("Bank Account Form with Errors and Submit button disabled");
   });
 
   it("soft deletes a bank account", function () {
-    cy.visit("/bankaccounts");
-    cy.getBySelLike("delete").first().click();
+    bankAccountPage.visit().deleteFirst();
 
     cy.wait("@gqlDeleteBankAccountMutation");
-    cy.getBySelLike("list-item").children().contains("Deleted");
+
+    bankAccountPage.assertFirstDeletedItemVisible();
     cy.visualSnapshot("Soft Delete Bank Account");
   });
 
@@ -166,14 +159,16 @@ describe("Bank Accounts", function () {
       }
     });
 
-    cy.visit("/bankaccounts");
+    bankAccountPage.visit();
     cy.wait("@getNotifications");
     cy.wait("@gqlListBankAccountQuery");
 
-    cy.getBySel("bankaccount-list").should("not.exist");
-    cy.getBySel("empty-list-header").should("contain", "No Bank Accounts");
-    cy.getBySel("user-onboarding-dialog").should("be.visible");
+    bankAccountPage
+      .assertEmptyListVisible()
+      .assertOnboardingDialogVisible();
+
     cy.getBySel("nav-top-notifications-count").should("exist");
     cy.visualSnapshot("User Onboarding Dialog is Visible");
   });
 });
+

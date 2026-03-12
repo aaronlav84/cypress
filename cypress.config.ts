@@ -4,6 +4,7 @@ import axios from "axios";
 import dotenv from "dotenv";
 import Promise from "bluebird";
 import codeCoverageTask from "@cypress/code-coverage/task";
+import allureWriter from "@shelex/cypress-allure-plugin/writer";
 import { defineConfig } from "cypress";
 import viteConfig from "./vite.cypress.config.ts";
 
@@ -22,6 +23,16 @@ export default defineConfig({
   projectId: "7s5okt",
   retries: {
     runMode: 2,
+  },
+  reporter: "cypress-mochawesome-reporter",
+  reporterOptions: {
+    charts: true,
+    reportPageTitle: "RWA Cypress Test Report",
+    embeddedScreenshots: true,
+    inlineAssets: true,
+    saveAllAttempts: false,
+    reportDir: "cypress/reports/html",
+    overwrite: false,
   },
   env: {
     apiUrl: "http://localhost:3001",
@@ -132,6 +143,7 @@ export default defineConfig({
       });
 
       codeCoverageTask(on, config);
+      allureWriter(on, config);
       return config;
     },
   },

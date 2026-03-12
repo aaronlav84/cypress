@@ -88,6 +88,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DEBUG: "cypress:server:args"
 
+      - name: Upload Mochawesome report (Chrome)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mochawesome-chrome-${{ matrix.containers }}
+          path: cypress/reports/html/
+          retention-days: 14
+
   ui-chrome-mobile-tests:
     timeout-minutes: 15
     runs-on: ubuntu-latest
@@ -224,3 +232,37 @@ jobs:
           # Recommended: pass the GitHub token lets this action correctly
           # determine the unique run id necessary to re-run the checks
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── Report generation ───────────────────────────────────────────────────────
+  # Merge per-container Mochawesome JSON files into a single HTML report and
+  # publish it as a workflow artifact for easy download / review.
+  merge-reports:
+    runs-on: ubuntu-latest
+    needs: [ui-chrome-tests, ui-chrome-mobile-tests, ui-firefox-tests, ui-firefox-mobile-tests]
+    if: always()
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all Mochawesome reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: mochawesome-chrome-*
+          merge-multiple: true
+          path: cypress/reports/html/
+
+      - name: Install report tooling
+        run: yarn add --dev mochawesome-merge mochawesome-report-generator
+
+      - name: Merge JSON reports
+        run: yarn report:merge
+
+      - name: Generate final HTML report
+        run: yarn report:generate
+
+      - name: Upload merged HTML report
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-test-report
+          path: cypress/reports/final/
+          retention-days: 30

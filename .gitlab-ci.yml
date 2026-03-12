@@ -1,0 +1,210 @@
+# .gitlab-ci.yml
+#
+# GitLab CI/CD pipeline for Cypress Real-World App
+#
+# Stages:
+#  1. install   — yarn install + Cypress binary verification
+#  2. verify    — TypeScript types, ESLint, unit tests, production build
+#  3. test      — Parallel E2E (Chrome / Firefox / mobile) + API tests
+#  4. report    — Merge Mochawesome JSON → HTML, generate Allure report
+#
+# Required GitLab CI/CD variables (Settings → CI/CD → Variables):
+#   CYPRESS_PROJECT_ID
+#   CYPRESS_RECORD_KEY
+
+image: cypress/browsers:22.20.0
+
+variables:
+  NODE_ENV: test
+  npm_config_cache: "$CI_PROJECT_DIR/.npm"
+  CYPRESS_CACHE_FOLDER: "$CI_PROJECT_DIR/cache/Cypress"
+
+# ── Cache ──────────────────────────────────────────────────────────────────────
+.yarn_cache: &yarn_cache
+  cache:
+    key:
+      files:
+        - yarn.lock
+    paths:
+      - node_modules/
+      - cache/Cypress
+    policy: pull
+
+stages:
+  - install
+  - verify
+  - test
+  - report
+
+# ── 1. Install ─────────────────────────────────────────────────────────────────
+install:
+  stage: install
+  cache:
+    key:
+      files:
+        - yarn.lock
+    paths:
+      - node_modules/
+      - cache/Cypress
+    policy: pull-push
+  script:
+    - yarn install --frozen-lockfile
+    - npx cypress verify
+    - yarn cypress info
+  artifacts:
+    paths:
+      - node_modules/
+      - cache/
+    expire_in: 1 hour
+
+# ── 2. Verify ──────────────────────────────────────────────────────────────────
+types:
+  stage: verify
+  <<: *yarn_cache
+  needs: [install]
+  script:
+    - yarn types
+
+lint:
+  stage: verify
+  <<: *yarn_cache
+  needs: [install]
+  script:
+    - yarn lint
+
+unit-tests:
+  stage: verify
+  <<: *yarn_cache
+  needs: [install]
+  script:
+    - yarn test:unit:ci
+
+build:
+  stage: verify
+  <<: *yarn_cache
+  needs: [install]
+  script:
+    - yarn build:ci
+  artifacts:
+    paths:
+      - build/
+    expire_in: 1 hour
+
+# ── 3. Tests ───────────────────────────────────────────────────────────────────
+.cypress_base: &cypress_base
+  <<: *yarn_cache
+  needs: [build]
+  before_script:
+    - yarn start:ci &
+    - yarn wait-on http://localhost:3000 --timeout 120000
+  after_script:
+    - yarn report:merge  || true
+    - yarn report:generate || true
+  artifacts:
+    when: always
+    paths:
+      - cypress/screenshots/
+      - cypress/videos/
+      - cypress/reports/
+    expire_in: 7 days
+
+e2e-chrome:
+  stage: test
+  <<: *cypress_base
+  parallel: 5
+  script:
+    - yarn cypress run
+        --browser chrome
+        --spec "cypress/tests/ui/*"
+        --record
+        --parallel
+        --group "UI - Chrome - GitLab"
+        --ci-build-id "$CI_PIPELINE_ID"
+
+e2e-chrome-mobile:
+  stage: test
+  <<: *cypress_base
+  parallel: 5
+  script:
+    - yarn cypress run
+        --browser chrome
+        --config '{"e2e":{"viewportWidth":375,"viewportHeight":667}}'
+        --spec "cypress/tests/ui/*"
+        --record
+        --parallel
+        --group "UI - Chrome - Mobile - GitLab"
+        --ci-build-id "$CI_PIPELINE_ID"
+
+e2e-firefox:
+  stage: test
+  <<: *cypress_base
+  parallel: 5
+  script:
+    - yarn cypress run
+        --browser firefox
+        --spec "cypress/tests/ui/*"
+        --record
+        --parallel
+        --group "UI - Firefox - GitLab"
+        --ci-build-id "$CI_PIPELINE_ID"
+
+e2e-firefox-mobile:
+  stage: test
+  <<: *cypress_base
+  parallel: 5
+  script:
+    - yarn cypress run
+        --browser firefox
+        --config '{"e2e":{"viewportWidth":375,"viewportHeight":667}}'
+        --spec "cypress/tests/ui/*"
+        --record
+        --parallel
+        --group "UI - Firefox - Mobile - GitLab"
+        --ci-build-id "$CI_PIPELINE_ID"
+
+api-tests:
+  stage: test
+  <<: *yarn_cache
+  needs: [build]
+  before_script:
+    - yarn start:ci &
+    - yarn wait-on http://localhost:3001 --timeout 120000
+  script:
+    - yarn cypress run
+        --browser chrome
+        --spec "cypress/tests/api/*"
+        --record
+        --group "API - GitLab"
+        --ci-build-id "$CI_PIPELINE_ID"
+  artifacts:
+    when: always
+    paths:
+      - cypress/screenshots/
+      - cypress/reports/
+    expire_in: 7 days
+
+# ── 4. Report ──────────────────────────────────────────────────────────────────
+merge-reports:
+  stage: report
+  <<: *yarn_cache
+  needs:
+    - e2e-chrome
+    - e2e-chrome-mobile
+    - e2e-firefox
+    - e2e-firefox-mobile
+    - api-tests
+  when: always
+  script:
+    - yarn report:merge
+    - yarn report:generate
+    - npx allure generate allure-results --clean -o allure-report || true
+  artifacts:
+    when: always
+    paths:
+      - cypress/reports/final/
+      - allure-report/
+    expose_as: "Test Reports"
+    expire_in: 30 days
+  # Publish as GitLab Pages (optional — enable Pages in project settings)
+  # pages:
+  #   publish: allure-report
