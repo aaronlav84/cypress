@@ -176,7 +176,7 @@
     "test:unit:ci": "vitest --run",
     "test:component:ci": "yarn cypress:run:component",
     "test:report": "cypress run",
-    "report:merge": "mochawesome-merge cypress/reports/html/*.json > cypress/reports/merged-report.json",
+    "report:merge": "mochawesome-merge cypress/reports/html/.jsons/*.json > cypress/reports/merged-report.json",
     "report:generate": "marge cypress/reports/merged-report.json --reportDir cypress/reports/final --inline",
     "report:allure": "allure generate allure-results --clean -o allure-report",
     "report:allure:open": "allure open allure-report",

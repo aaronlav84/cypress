@@ -31,17 +31,8 @@ const getNavTiming = (): Cypress.Chainable<PerformanceNavigationTiming | undefin
 // ── Suites ──────────────────────────────────────────────────────────────────
 
 describe("Performance – API response-time budgets", () => {
-  let user: any;
-
-  before(() => {
-    cy.task("db:seed");
-    cy.database("find", "users").then((u) => {
-      user = u;
-    });
-  });
-
   beforeEach(() => {
-    cy.loginByXstate(user.username);
+    cy.loginByXstate("Heath93");
   });
 
   it("GET /transactions responds within budget", () => {
@@ -64,17 +55,8 @@ describe("Performance – API response-time budgets", () => {
 });
 
 describe("Performance – Page load budgets (Navigation Timing API)", () => {
-  let user: any;
-
-  before(() => {
-    cy.task("db:seed");
-    cy.database("find", "users").then((u) => {
-      user = u;
-    });
-  });
-
   beforeEach(() => {
-    cy.loginByXstate(user.username);
+    cy.loginByXstate("Heath93");
   });
 
   it("home page full load is within budget", () => {
